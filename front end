@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Smart Attendance</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <h2>Smart Attendance System</h2>
+
+  <input id="name" placeholder="Enter Name"/>
+  <button onclick="register()">Register</button>
+
+  <br><br>
+
+  <video id="video" width="600" autoplay muted></video>
+
+  <br>
+  <button onclick="markAttendance()">Mark Attendance</button>
+</body>
+</html>
