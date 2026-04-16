@@ -1,0 +1,48 @@
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+require("dotenv").config();
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+mongoose.connect(process.env.MONGO_URL)
+.then(()=>console.log("DB Connected"))
+.catch(err=>console.log(err));
+
+const User = mongoose.model("User", new mongoose.Schema({
+  name: String,
+  email: String,
+  faceDescriptor: Array
+}));
+
+const Attendance = mongoose.model("Attendance", new mongoose.Schema({
+  name: String,
+  time: { type: Date, default: Date.now }
+}));
+
+app.post("/register", async (req, res) => {
+  const user = new User(req.body);
+  await user.save();
+  res.send("User Registered");
+});
+
+app.get("/users", async (req, res) => {
+  const users = await User.find();
+  res.json(users);
+});
+
+app.post("/attendance", async (req, res) => {
+  const record = new Attendance(req.body);
+  await record.save();
+  res.send("Attendance Marked");
+});
+
+app.get("/attendance", async (req, res) => {
+  const data = await Attendance.find();
+  res.json(data);
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, ()=>console.log("Server running"));
