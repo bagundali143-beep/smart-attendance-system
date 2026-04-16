@@ -1,47 +1,86 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Smart Attendance</title>
+  <title>Smart Attendance Pro</title>
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
 
   <style>
     body {
-      text-align: center;
       font-family: Arial;
       background: #0f172a;
       color: white;
+      text-align: center;
     }
-    video {
-      width: 400px;
+    .card {
+      background: #1e293b;
+      padding: 20px;
+      margin: 10px;
       border-radius: 10px;
+      display: inline-block;
     }
     input, button {
       padding: 10px;
-      margin: 10px;
+      margin: 5px;
+    }
+    video {
+      width: 350px;
+      border-radius: 10px;
+    }
+    table {
+      margin: auto;
+      width: 80%;
     }
   </style>
 </head>
 
 <body>
-  <h1>Smart Attendance System</h1>
 
-  <input id="name" placeholder="Enter Name">
+<h1>🚀 Smart Attendance Pro</h1>
+
+<div class="card">
+  <h3>Register User</h3>
+  <input id="name" placeholder="Name">
+  <input id="password" placeholder="Password" type="password">
+  <br>
   <button onclick="register()">Register Face</button>
+</div>
 
-  <br><br>
+<div class="card">
+  <h3>Login</h3>
+  <input id="loginName" placeholder="Name">
+  <input id="loginPass" type="password" placeholder="Password">
+  <br>
+  <button onclick="login()">Login</button>
+</div>
 
-  <video id="video" autoplay muted></video>
+<br>
 
-  <br><br>
+<video id="video" autoplay muted></video>
 
-  <button onclick="markAttendance()">Mark Attendance</button>
+<br>
+<button onclick="markAttendance()">Mark Attendance</button>
+
+<hr>
+
+<h2>📊 Attendance Logs</h2>
+<button onclick="loadAttendance()">Refresh</button>
+
+<table border="1">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Time</th>
+    </tr>
+  </thead>
+  <tbody id="table"></tbody>
+</table>
 
 <script>
-const video = document.getElementById("video");
-
-// 👉 CHANGE THIS AFTER BACKEND DEPLOY
 const API = "http://localhost:5000";
+const video = document.getElementById("video");
+let currentUser = null;
 
+// Load AI models
 Promise.all([
   faceapi.nets.tinyFaceDetector.loadFromUri("https://cdn.jsdelivr.net/npm/face-api.js/models"),
   faceapi.nets.faceRecognitionNet.loadFromUri("https://cdn.jsdelivr.net/npm/face-api.js/models"),
@@ -53,26 +92,56 @@ function startVideo(){
     .then(stream => video.srcObject = stream);
 }
 
+// REGISTER
 async function register(){
   const name = document.getElementById("name").value;
+  const password = document.getElementById("password").value;
 
   const detection = await faceapi.detectSingleFace(video)
     .withFaceLandmarks()
     .withFaceDescriptor();
 
   await fetch(API + "/register", {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
     body: JSON.stringify({
       name,
+      password,
       descriptor: Array.from(detection.descriptor)
     })
   });
 
-  alert("Registered");
+  alert("User Registered");
 }
 
+// LOGIN
+async function login(){
+  const name = document.getElementById("loginName").value;
+  const password = document.getElementById("loginPass").value;
+
+  const res = await fetch(API + "/login", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ name, password })
+  });
+
+  const data = await res.json();
+
+  if(data.success){
+    currentUser = name;
+    alert("Login successful");
+  } else {
+    alert("Invalid login");
+  }
+}
+
+// MARK ATTENDANCE
 async function markAttendance(){
+  if(!currentUser){
+    alert("Login first!");
+    return;
+  }
+
   const users = await fetch(API + "/users").then(res=>res.json());
 
   const detection = await faceapi.detectSingleFace(video)
@@ -83,23 +152,41 @@ async function markAttendance(){
     users.map(u => new faceapi.LabeledFaceDescriptors(
       u.name,
       [new Float32Array(u.descriptor)]
-    ))
+    )),
+    0.5 // 🔥 stricter matching
   );
 
   const match = faceMatcher.findBestMatch(detection.descriptor);
 
-  if(match.label !== "unknown"){
+  if(match.label === currentUser){
     await fetch(API + "/attendance", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ name: match.label })
+      body: JSON.stringify({ name: currentUser })
     });
 
-    alert("Attendance marked: " + match.label);
+    alert("Attendance marked");
   } else {
-    alert("Face not recognized");
+    alert("Face mismatch!");
   }
 }
+
+// LOAD ATTENDANCE
+async function loadAttendance(){
+  const data = await fetch(API + "/attendance").then(res=>res.json());
+
+  const table = document.getElementById("table");
+  table.innerHTML = "";
+
+  data.forEach(d => {
+    table.innerHTML += `
+      <tr>
+        <td>${d.name}</td>
+        <td>${new Date(d.time).toLocaleString()}</td>
+      </tr>`;
+  });
+}
 </script>
+
 </body>
 </html>
