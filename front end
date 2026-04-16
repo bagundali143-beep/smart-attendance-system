@@ -3,19 +3,103 @@
 <head>
   <title>Smart Attendance</title>
   <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
-  <script defer src="app.js"></script>
-</head>
-<body>
-  <h2>Smart Attendance System</h2>
 
-  <input id="name" placeholder="Enter Name"/>
-  <button onclick="register()">Register</button>
+  <style>
+    body {
+      text-align: center;
+      font-family: Arial;
+      background: #0f172a;
+      color: white;
+    }
+    video {
+      width: 400px;
+      border-radius: 10px;
+    }
+    input, button {
+      padding: 10px;
+      margin: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Smart Attendance System</h1>
+
+  <input id="name" placeholder="Enter Name">
+  <button onclick="register()">Register Face</button>
 
   <br><br>
 
-  <video id="video" width="600" autoplay muted></video>
+  <video id="video" autoplay muted></video>
 
-  <br>
+  <br><br>
+
   <button onclick="markAttendance()">Mark Attendance</button>
+
+<script>
+const video = document.getElementById("video");
+
+// 👉 CHANGE THIS AFTER BACKEND DEPLOY
+const API = "http://localhost:5000";
+
+Promise.all([
+  faceapi.nets.tinyFaceDetector.loadFromUri("https://cdn.jsdelivr.net/npm/face-api.js/models"),
+  faceapi.nets.faceRecognitionNet.loadFromUri("https://cdn.jsdelivr.net/npm/face-api.js/models"),
+  faceapi.nets.faceLandmark68Net.loadFromUri("https://cdn.jsdelivr.net/npm/face-api.js/models")
+]).then(startVideo);
+
+function startVideo(){
+  navigator.mediaDevices.getUserMedia({ video: {} })
+    .then(stream => video.srcObject = stream);
+}
+
+async function register(){
+  const name = document.getElementById("name").value;
+
+  const detection = await faceapi.detectSingleFace(video)
+    .withFaceLandmarks()
+    .withFaceDescriptor();
+
+  await fetch(API + "/register", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      name,
+      descriptor: Array.from(detection.descriptor)
+    })
+  });
+
+  alert("Registered");
+}
+
+async function markAttendance(){
+  const users = await fetch(API + "/users").then(res=>res.json());
+
+  const detection = await faceapi.detectSingleFace(video)
+    .withFaceLandmarks()
+    .withFaceDescriptor();
+
+  const faceMatcher = new faceapi.FaceMatcher(
+    users.map(u => new faceapi.LabeledFaceDescriptors(
+      u.name,
+      [new Float32Array(u.descriptor)]
+    ))
+  );
+
+  const match = faceMatcher.findBestMatch(detection.descriptor);
+
+  if(match.label !== "unknown"){
+    await fetch(API + "/attendance", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ name: match.label })
+    });
+
+    alert("Attendance marked: " + match.label);
+  } else {
+    alert("Face not recognized");
+  }
+}
+</script>
 </body>
 </html>
